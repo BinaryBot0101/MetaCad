@@ -15,6 +15,7 @@ Run these commands from PowerShell:
 ```powershell
 cd "E:\Scratch Pad\MetaCad\FreeCAD"
 docker compose build
+docker compose run --rm configure bash -c "find /workspace/FreeCAD -type f -exec touch {} + && rm -rf /workspace/FreeCAD/build/debug/*"
 docker compose run --rm configure
 docker compose run --rm build
 docker compose --profile desktop up desktop
@@ -39,6 +40,23 @@ docker compose build
 ```
 
 Builds the local Docker image from the `Dockerfile`. This installs Ubuntu packages, Pixi, and the FreeCAD dependency environment needed to configure and build the project.
+
+```powershell
+docker compose run --rm configure bash -c "find /workspace/FreeCAD -type f -exec touch {} + && rm -rf /workspace/FreeCAD/build/debug/*"
+```
+
+Fixes a Ninja timestamp sync issue that can occur when the Docker container's system clock is out of sync with the host or when build artifacts have stale timestamps. This command:
+
+- Touches every file in the repository to update timestamps to the current container time
+- Clears any existing debug build artifacts so CMake/Ninja regenerates them cleanly
+
+Without this step, you may see the following fatal error during the build step:
+
+```text
+ninja: error: manifest 'build.ninja' still dirty after 100 tries, perhaps system time is not set
+```
+
+This happens because Ninja tracks file modification times to decide what needs rebuilding. When the container clock drifts from the host (common on cloud VMs, WSL, or after system sleep), Ninja enters an infinite loop trying to reconcile stale timestamps. Resetting timestamps and clearing old build files forces a clean state.
 
 ```powershell
 docker compose run --rm configure
