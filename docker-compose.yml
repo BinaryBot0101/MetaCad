@@ -1,0 +1,79 @@
+name: freecad-dev
+
+x-freecad-service: &freecad-service
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: freecad-dev:local
+  working_dir: /workspace/FreeCAD
+  environment:
+    QT_QPA_PLATFORM: "${QT_QPA_PLATFORM:-offscreen}"
+    DISPLAY: "${DISPLAY:-}"
+    FREECAD_USER_HOME: /workspace/.freecad
+    CCACHE_DIR: /workspace/.ccache
+    COPILOT_PROVIDER: "${COPILOT_PROVIDER:-local}"
+    OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+    OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4.1-mini}"
+    OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+    OPENROUTER_MODEL: "${OPENROUTER_MODEL:-openai/gpt-4o-mini}"
+    OPENROUTER_BASE_URL: "${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}"
+    OPENROUTER_SITE_URL: "${OPENROUTER_SITE_URL:-http://localhost:8010}"
+    OPENROUTER_APP_NAME: "${OPENROUTER_APP_NAME:-MetaCad FreeCAD Copilot}"
+  volumes:
+    - .:/workspace/FreeCAD
+    - freecad-pixi:/workspace/FreeCAD/.pixi
+    - freecad-build:/workspace/FreeCAD/build
+    - freecad-ccache:/workspace/.ccache
+
+services:
+  freecad:
+    <<: *freecad-service
+    stdin_open: true
+    tty: true
+    command: ["bash"]
+
+  configure:
+    <<: *freecad-service
+    profiles: ["build"]
+    command: ["pixi", "run", "configure-debug"]
+
+  build:
+    <<: *freecad-service
+    profiles: ["build"]
+    command: ["pixi", "run", "build-debug"]
+
+  test:
+    <<: *freecad-service
+    profiles: ["test"]
+    command: ["pixi", "run", "xvfb-run", "-a", "build/debug/bin/FreeCAD", "-t", "0"]
+
+  cmd:
+    <<: *freecad-service
+    profiles: ["run"]
+    command: ["pixi", "run", "build/debug/bin/FreeCADCmd", "--help"]
+
+  desktop:
+    <<: *freecad-service
+    profiles: ["desktop"]
+    environment:
+      QT_QPA_PLATFORM: xcb
+      DISPLAY: ":1"
+      FREECAD_USER_HOME: /workspace/.freecad
+      CCACHE_DIR: /workspace/.ccache
+      COPILOT_PROVIDER: "${COPILOT_PROVIDER:-local}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4.1-mini}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      OPENROUTER_MODEL: "${OPENROUTER_MODEL:-openai/gpt-4o-mini}"
+      OPENROUTER_BASE_URL: "${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}"
+      OPENROUTER_SITE_URL: "${OPENROUTER_SITE_URL:-http://localhost:8010}"
+      OPENROUTER_APP_NAME: "${OPENROUTER_APP_NAME:-MetaCad FreeCAD Copilot}"
+      VNC_RESOLUTION: "${VNC_RESOLUTION:-1920x1080x24}"
+    ports:
+      - "8010:6080"
+    command: ["start-novnc"]
+
+volumes:
+  freecad-build:
+  freecad-pixi:
+  freecad-ccache:
