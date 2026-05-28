@@ -8,6 +8,24 @@ This project includes a Docker setup for building FreeCAD and opening it through
 - PowerShell or another terminal
 - This repository checked out locally
 
+## Linux / CRLF Line Ending Fix
+
+If you are running on Linux and the repository was checked out on Windows (or via a Windows share), shell scripts may have Windows-style `CRLF` line endings. This causes the container startup to fail with:
+
+```text
+/usr/bin/env: 'bash\r': No such file or directory
+/usr/bin/env: use -[v]S to pass options in shebang lines
+```
+
+Fix this **before** running `docker compose build`:
+
+```bash
+sudo apt install dos2unix
+dos2unix docker/start-novnc.sh
+```
+
+This converts the script to Unix-style `LF` line endings so the container can execute it correctly.
+
 ## Start FreeCAD
 
 Run these commands from PowerShell:
