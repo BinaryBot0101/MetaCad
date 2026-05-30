@@ -22,6 +22,110 @@ from provider import describe_plan, get_provider
 
 PANEL_OBJECT_NAME = "CopilotDockPanel"
 
+# Modern CAD-dark stylesheet (AutoCAD / SolidWorks inspired)
+_CAD_STYLESHEET = """
+QWidget {
+    background-color: #2B2B2B;
+    color: #ECECEC;
+    font-family: "Segoe UI", "Microsoft Sans Serif", sans-serif;
+    font-size: 12px;
+}
+
+QPlainTextEdit {
+    background-color: #1E1E1E;
+    color: #ECECEC;
+    border: 1px solid #404040;
+    border-radius: 3px;
+    padding: 6px;
+    selection-background-color: #264F78;
+}
+
+QPlainTextEdit:focus {
+    border: 1px solid #0078D4;
+}
+
+QLabel {
+    color: #AAAAAA;
+    background-color: transparent;
+}
+
+QLabel#HeaderLabel {
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 4px 0px;
+}
+
+QLabel#StatusLabel {
+    color: #4CAF50;
+    font-size: 11px;
+    padding: 2px 6px;
+    background-color: #1E1E1E;
+    border-radius: 2px;
+}
+
+QPushButton {
+    background-color: #3C3C3C;
+    color: #ECECEC;
+    border: 1px solid #505050;
+    border-radius: 3px;
+    padding: 6px 14px;
+    min-height: 18px;
+}
+
+QPushButton:hover {
+    background-color: #505050;
+    border: 1px solid #0078D4;
+}
+
+QPushButton:pressed {
+    background-color: #0078D4;
+    border: 1px solid #0078D4;
+}
+
+QPushButton#PrimaryButton {
+    background-color: #0078D4;
+    border: 1px solid #0078D4;
+    color: #FFFFFF;
+    font-weight: bold;
+}
+
+QPushButton#PrimaryButton:hover {
+    background-color: #2D8CFF;
+    border: 1px solid #2D8CFF;
+}
+
+QPushButton#PrimaryButton:pressed {
+    background-color: #005A9E;
+    border: 1px solid #005A9E;
+}
+
+QPushButton#DangerButton {
+    background-color: #3C3C3C;
+    border: 1px solid #505050;
+    color: #EF5350;
+}
+
+QPushButton#DangerButton:hover {
+    background-color: #EF5350;
+    border: 1px solid #EF5350;
+    color: #FFFFFF;
+}
+
+QFrame#Separator {
+    background-color: #404040;
+    max-height: 1px;
+    min-height: 1px;
+}
+
+QFrame#AccentBar {
+    background-color: #0078D4;
+    max-width: 3px;
+    min-width: 3px;
+}
+"""
+
+
 
 class CopilotPanel(QtWidgets.QDockWidget):
     """Dockable prompt interface."""
@@ -41,46 +145,111 @@ class CopilotPanel(QtWidgets.QDockWidget):
 
     def _build_ui(self):
         root = QtWidgets.QWidget()
+        root.setStyleSheet(_CAD_STYLESHEET)
         layout = QtWidgets.QVBoxLayout(root)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
 
+        # Header with accent bar
+        header = QtWidgets.QHBoxLayout()
+        header.setSpacing(0)
+        accent = QtWidgets.QFrame()
+        accent.setObjectName("AccentBar")
+        accent.setFixedWidth(3)
+        header_title = QtWidgets.QLabel("COPILOT AI")
+        header_title.setObjectName("HeaderLabel")
+        self.status_dot = QtWidgets.QLabel("READY")
+        self.status_dot.setObjectName("StatusLabel")
+        header.addWidget(accent)
+        header.addSpacing(6)
+        header.addWidget(header_title)
+        header.addStretch(1)
+        header.addWidget(self.status_dot)
+        layout.addLayout(header)
+
+        sep1 = QtWidgets.QFrame()
+        sep1.setObjectName("Separator")
+        layout.addWidget(sep1)
+
+        # Prompt area (command-line style)
+        prompt_label = QtWidgets.QLabel("COMMAND")
+        layout.addWidget(prompt_label)
         self.prompt = QtWidgets.QPlainTextEdit()
         self.prompt.setPlaceholderText(
-            "Try: create a box length 40 width 20 height 10\n"
-            "Try: move selected x 10 y 0 z 5\n"
-            "Try: color selected blue\n"
-            "Or attach an image and ask: create this object"
+            "create a box length 40 width 20 height 10\n"
+            "move selected x 10 y 0 z 5\n"
+            "color selected blue"
         )
-        self.prompt.setMinimumHeight(90)
+        self.prompt.setMaximumBlockCount(6)
+        self.prompt.setMinimumHeight(70)
+        self.prompt.setMaximumHeight(100)
         layout.addWidget(self.prompt)
 
-        image_row = QtWidgets.QHBoxLayout()
+        # Image status bar
+        image_bar = QtWidgets.QHBoxLayout()
+        image_bar.setSpacing(6)
         self.image_label = QtWidgets.QLabel("No image attached")
-        self.attach_image_button = QtWidgets.QPushButton("Attach Image")
-        self.clear_image_button = QtWidgets.QPushButton("Clear Image")
-        image_row.addWidget(self.image_label, 1)
-        image_row.addWidget(self.attach_image_button)
-        image_row.addWidget(self.clear_image_button)
-        layout.addLayout(image_row)
+        self.attach_image_button = QtWidgets.QPushButton("")
+        self.attach_image_button.setToolTip("Attach reference image")
+        self.attach_image_button.setText("")
+        self.attach_image_button.setFixedSize(28, 28)
+        self.attach_image_button.setStyleSheet("QPushButton { font-size: 14px; padding: 0px; }")
+        self.attach_image_button.setText("")
+        self._set_button_icon_text(self.attach_image_button, "+")
+        self.clear_image_button = QtWidgets.QPushButton("")
+        self.clear_image_button.setToolTip("Clear image")
+        self.clear_image_button.setFixedSize(28, 28)
+        self.clear_image_button.setStyleSheet("QPushButton { font-size: 14px; padding: 0px; }")
+        self._set_button_icon_text(self.clear_image_button, "x")
+        image_bar.addWidget(self.image_label, 1)
+        image_bar.addWidget(self.attach_image_button)
+        image_bar.addWidget(self.clear_image_button)
+        layout.addLayout(image_bar)
 
-        button_row = QtWidgets.QHBoxLayout()
-        self.run_button = QtWidgets.QPushButton("Run")
-        self.plan_button = QtWidgets.QPushButton("Preview Plan")
-        self.clear_button = QtWidgets.QPushButton("Clear")
-        button_row.addWidget(self.run_button)
-        button_row.addWidget(self.plan_button)
-        button_row.addWidget(self.clear_button)
-        layout.addLayout(button_row)
+        # Toolbar
+        toolbar = QtWidgets.QHBoxLayout()
+        toolbar.setSpacing(8)
+        self.run_button = QtWidgets.QPushButton("RUN")
+        self.run_button.setObjectName("PrimaryButton")
+        self.run_button.setMinimumWidth(80)
+        self.plan_button = QtWidgets.QPushButton("PREVIEW")
+        self.plan_button.setMinimumWidth(80)
+        self.clear_button = QtWidgets.QPushButton("CLEAR")
+        self.clear_button.setObjectName("DangerButton")
+        self.clear_button.setMinimumWidth(70)
+        toolbar.addWidget(self.run_button)
+        toolbar.addWidget(self.plan_button)
+        toolbar.addStretch(1)
+        toolbar.addWidget(self.clear_button)
+        layout.addLayout(toolbar)
 
+        sep2 = QtWidgets.QFrame()
+        sep2.setObjectName("Separator")
+        layout.addWidget(sep2)
+
+        # Console output
+        console_label = QtWidgets.QLabel("CONSOLE OUTPUT")
+        layout.addWidget(console_label)
         self.output = QtWidgets.QPlainTextEdit()
         self.output.setReadOnly(True)
-        self.output.setMinimumHeight(180)
-        layout.addWidget(self.output)
+        self.output.setMinimumHeight(160)
+        font = QtGui.QFont("Consolas", 10)
+        if not font.exactMatch():
+            font = QtGui.QFont("Courier New", 10)
+        if not font.exactMatch():
+            font = QtGui.QFont("Monospace", 10)
+        self.output.setFont(font)
+        self.output.setStyleSheet(
+            self.output.styleSheet() +
+            " QPlainTextEdit { background-color: #151515; border: 1px solid #2A2A2A; }"
+        )
+        layout.addWidget(self.output, 1)
 
         self.setWidget(root)
 
         self.run_button.clicked.connect(self.run_prompt)
         self.plan_button.clicked.connect(self.preview_plan)
-        self.clear_button.clicked.connect(self.output.clear)
+        self.clear_button.clicked.connect(self._clear_console)
         self.attach_image_button.clicked.connect(self.attach_image)
         self.clear_image_button.clicked.connect(self.clear_image)
 
@@ -130,11 +299,26 @@ class CopilotPanel(QtWidgets.QDockWidget):
     def _write(self, text):
         self.output.setPlainText(text)
         App.Console.PrintMessage("{0}\n".format(text))
+        self._set_status("READY", "#4CAF50")
 
     def _write_error(self, err):
         message = "Copilot error: {0}".format(err)
         self.output.setPlainText(message)
         App.Console.PrintError("{0}\n{1}\n".format(message, traceback.format_exc()))
+        self._set_status("ERROR", "#EF5350")
+
+    def _clear_console(self):
+        self.output.clear()
+        self._set_status("READY", "#4CAF50")
+
+    def _set_status(self, text, color):
+        self.status_dot.setText(text)
+        self.status_dot.setStyleSheet(
+            "QLabel#StatusLabel {{ color: {0}; background-color: #1E1E1E; padding: 2px 6px; border-radius: 2px; font-size: 11px; }}".format(color)
+        )
+
+    def _set_button_icon_text(self, button, text):
+        button.setText(text)
 
     def _context(self):
         context = _context()
